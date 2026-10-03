@@ -13,6 +13,7 @@ namespace KartRacer
         private GameObject _shield;
         private Transform _label;
         private Material[] _tierMats;
+        private ParticleSystem _dust, _boostFx, _puff;
 
         public static KartVisual Build(Kart k)
         {
@@ -28,6 +29,19 @@ namespace KartRacer
             Mats.Prim(PrimitiveType.Cube, t, new Vector3(0f, 0.9f, -1.05f), new Vector3(1.4f, 0.1f, 0.5f), trim);
             Mats.Prim(PrimitiveType.Cube, t, new Vector3(-0.55f, 0.65f, -1.05f), new Vector3(0.1f, 0.5f, 0.1f), dark);
             Mats.Prim(PrimitiveType.Cube, t, new Vector3(0.55f, 0.65f, -1.05f), new Vector3(0.1f, 0.5f, 0.1f), dark);
+
+            // extras: stripe, headlights, bumper, exhausts
+            var chrome = Mats.Lit(new Color(0.78f, 0.8f, 0.85f), 0.9f);
+            var lamp = Mats.Unlit(new Color(1f, 0.95f, 0.6f));
+            Mats.Prim(PrimitiveType.Cube, t, new Vector3(0f, 0.63f, 0f), new Vector3(0.28f, 0.03f, 2.0f), Mats.Lit(Color.white, 0.6f));
+            Mats.Prim(PrimitiveType.Cube, t, new Vector3(-0.3f, 0.4f, 1.52f), new Vector3(0.22f, 0.13f, 0.06f), lamp);
+            Mats.Prim(PrimitiveType.Cube, t, new Vector3(0.3f, 0.4f, 1.52f), new Vector3(0.22f, 0.13f, 0.06f), lamp);
+            Mats.Prim(PrimitiveType.Cube, t, new Vector3(0f, 0.27f, 1.5f), new Vector3(1.15f, 0.1f, 0.1f), chrome);
+            for (int ex = -1; ex <= 1; ex += 2)
+            {
+                var pipe = Mats.Prim(PrimitiveType.Cylinder, t, new Vector3(ex * 0.32f, 0.42f, -1.12f), new Vector3(0.16f, 0.14f, 0.16f), chrome);
+                pipe.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            }
 
             int w = 0;
             for (int fx = -1; fx <= 1; fx += 2)
@@ -57,6 +71,11 @@ namespace KartRacer
                 v._sparks[s] = sp.GetComponent<Renderer>();
                 sp.SetActive(false);
             }
+
+            // particles: dust while drifting, orange trail while boosting, light exhaust puffs
+            v._dust = Fx.Make(t, new Vector3(0f, 0.2f, -1.2f), new Color(0.85f, 0.82f, 0.75f), 0.55f, 0.6f, 1.5f, 30f);
+            v._boostFx = Fx.Make(t, new Vector3(0f, 0.5f, -1.7f), new Color(1f, 0.6f, 0.15f), 0.5f, 0.45f, 2.5f, 45f);
+            v._puff = Fx.Make(t, new Vector3(0f, 0.45f, -1.3f), new Color(0.9f, 0.9f, 0.95f), 0.16f, 0.4f, 1f, 10f, 16);
 
             // boost flame
             var fl = Mats.Prim(PrimitiveType.Sphere, t, new Vector3(0f, 0.5f, -1.5f), new Vector3(0.5f, 0.5f, 1.4f), Mats.Unlit(new Color(1f, 0.55f, 0.1f)));
@@ -105,6 +124,9 @@ namespace KartRacer
                 if (k.drifting) _sparks[s].sharedMaterial = _tierMats[Mathf.Max(0, k.DriftTier - 1)];
                 _sparks[s].transform.localScale = Vector3.one * (spark ? 0.5f + 0.15f * Mathf.Sin(Time.time * 40f + s) : 0.28f);
             }
+            Fx.Set(_dust, k.drifting && k.speed > 8f);
+            Fx.Set(_boostFx, k.Boosting);
+            Fx.Set(_puff, k.raceActive && k.speed > 4f && !k.drifting && !k.Boosting);
             _flame.gameObject.SetActive(k.Boosting);
             if (k.Boosting) _flame.localScale = new Vector3(0.5f, 0.5f, 1.2f + 0.5f * Mathf.Sin(Time.time * 50f));
             _shield.SetActive(k.shield);

@@ -177,6 +177,7 @@ namespace KartRacer
             _gf.CommitName();
             _gf.HideMenus();
             _menuStatus.text = "";
+            Sfx.Music(-1);
             ShowOnly(_menu);
             _mode = Mode.Menu;
         }

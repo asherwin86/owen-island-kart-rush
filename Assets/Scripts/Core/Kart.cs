@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace KartRacer
 {
-    public enum ItemType { None, Turbo, Slick, Bolt, Shield }
+    public enum ItemType { None, Turbo, Slick, Bolt, Shield, Triple, Mega }
 
     /// <summary>One kart: a sphere rigidbody that is steered arcade-style (heading + grip), with
     /// drifting, mini-turbo boosts, spin-outs and a held item. A driver (player or AI) sets the inputs.</summary>
@@ -33,6 +33,7 @@ namespace KartRacer
         public int driftDir;
         public float driftCharge, boostTimer, spinTimer, speed, visualSpin, padCooldown, itemRoll, stuckTimer;
         public bool shield, raceActive;
+        public int tripleLeft, respawns;
         public ItemType item = ItemType.None;
         public int trackIdx, crossings, place = 1, startSlot;
         public float finishTime;
@@ -69,6 +70,7 @@ namespace KartRacer
             modelGo.transform.localPosition = new Vector3(0f, -0.6f, 0f);
             k.model = modelGo.transform;
             k.visual = KartVisual.Build(k);
+            if (isPlayer) go.AddComponent<KartAudio>().kart = k;
             k.trackIdx = track.Nearest(pos, 0, track.N / 2);
             return k;
         }
@@ -180,6 +182,7 @@ namespace KartRacer
         {
             boostTimer = Mathf.Max(boostTimer, seconds);
             speed = Mathf.Max(speed, maxSpeed * 0.95f);
+            if (isPlayer) Sfx.Play("boost", 0.6f);
         }
 
         /// <summary>Returns true if the hit landed (false if a shield absorbed it).</summary>
@@ -188,6 +191,7 @@ namespace KartRacer
             if (spinTimer > 0f) return false;
             if (shield) { shield = false; return false; }
             spinTimer = 1.4f;
+            if (isPlayer) Sfx.Play("hit", 0.9f);
             boostTimer = 0f;
             drifting = false; driftCharge = 0f;
             Vector3 v = rb.linearVelocity; rb.linearVelocity = new Vector3(v.x * 0.3f, v.y, v.z * 0.3f);
@@ -196,6 +200,7 @@ namespace KartRacer
 
         public void Respawn()
         {
+            respawns++;
             int idx = track.Nearest(rb.position, trackIdx, 30);
             idx = track.Wrap(idx - 2);
             rb.position = track.pts[idx] + Vector3.up * 0.7f;

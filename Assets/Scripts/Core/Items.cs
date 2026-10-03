@@ -144,13 +144,18 @@ namespace KartRacer
             int n = _karts.Count;
             float ratio = n <= 1 ? 0f : (k.place - 1f) / (n - 1f);
             float wTurbo = 20f + 40f * ratio, wSlick = 10f + 30f * (1f - ratio), wBolt = 8f + 35f * ratio, wShield = 10f + 30f * (1f - ratio);
-            float roll = Random.value * (wTurbo + wSlick + wBolt + wShield);
+            float wTriple = 6f + 18f * ratio, wMega = 1f + 16f * ratio * ratio;
+            float roll = Random.value * (wTurbo + wSlick + wBolt + wShield + wTriple + wMega);
             ItemType it;
             if ((roll -= wTurbo) < 0f) it = ItemType.Turbo;
             else if ((roll -= wSlick) < 0f) it = ItemType.Slick;
             else if ((roll -= wBolt) < 0f) it = ItemType.Bolt;
-            else it = ItemType.Shield;
+            else if ((roll -= wShield) < 0f) it = ItemType.Shield;
+            else if ((roll -= wTriple) < 0f) it = ItemType.Triple;
+            else it = ItemType.Mega;
             k.item = it;
+            if (it == ItemType.Triple) k.tripleLeft = 3;
+            if (k.isPlayer) Sfx.Play("pickup", 0.7f);
             k.itemRoll = 0.9f;
         }
 
@@ -163,8 +168,18 @@ namespace KartRacer
         public void Use(Kart k)
         {
             if (k.item == ItemType.None || k.itemRoll > 0f || !k.raceActive) return;
+            if (k.isPlayer) Sfx.Play("use", 0.6f);
             switch (k.item)
             {
+                case ItemType.Triple:
+                    k.Boost(1.0f);
+                    k.tripleLeft--;
+                    if (k.tripleLeft > 0) { k.itemRoll = 0.4f; return; }
+                    break;
+                case ItemType.Mega:
+                    k.Boost(2.6f);
+                    k.shield = true; _shieldTimers[k] = 2.8f;
+                    break;
                 case ItemType.Turbo:
                     k.Boost(1.6f);
                     break;

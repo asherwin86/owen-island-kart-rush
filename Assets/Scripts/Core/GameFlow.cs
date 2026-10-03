@@ -32,6 +32,16 @@ namespace KartRacer
         private Image[] _swatches = new Image[8];
         private int _region, _colorIndex;
         private bool _paused;
+        private TMP_Text _diffLabel, _soundLabel;
+        private Button _nextBtn, _retryBtn;
+        private TMP_Text _nextLabel;
+        private readonly Image[] _podium = new Image[3];
+        private readonly TMP_Text[] _podiumName = new TMP_Text[3], _podiumNum = new TMP_Text[3];
+        private bool _gpActive;
+        private int _gpIndex, _gpRegion;
+        private Dictionary<string, int> _gpPts = new Dictionary<string, int>();
+        private Dictionary<string, string> _gpNames = new Dictionary<string, string>();
+        private static readonly int[] GpPoints = { 15, 12, 10, 8, 6, 4, 2, 1 };
         public System.Action OnlineClicked;
         public OnlineFlow Online;
 
@@ -88,7 +98,28 @@ namespace KartRacer
             Btn(_title.transform, "PLAY", C, new Vector2(0f, -170f), new Vector2(380f, 92f), new Color(0.15f, 0.7f, 0.3f), OpenIsland, 46f);
             Btn(_title.transform, "ONLINE RACE", C, new Vector2(0f, -275f), new Vector2(380f, 70f), new Color(0.2f, 0.45f, 0.9f), () => OnlineClicked?.Invoke(), 34f);
             Label(_title.transform, "W / Arrows: drive    A / D: steer    Space: drift    E: use item    R: reset    Esc: pause", 22f, B, new Vector2(0f, 24f), new Vector2(1200f, 40f), TextAlignmentOptions.Center, new Color(0.1f, 0.2f, 0.1f));
+            var db = Btn(_title.transform, "", TL, new Vector2(170f, -45f), new Vector2(300f, 54f), new Color(0f, 0f, 0f, 0.35f), CycleDifficulty, 22f);
+            _diffLabel = db.GetComponentInChildren<TMP_Text>();
+            var sb = Btn(_title.transform, "", TR, new Vector2(-130f, -45f), new Vector2(220f, 54f), new Color(0f, 0f, 0f, 0.35f), ToggleSound, 22f);
+            _soundLabel = sb.GetComponentInChildren<TMP_Text>();
+            RefreshTitleToggles();
             PickColor(_colorIndex);
+        }
+
+        private void CycleDifficulty()
+        {
+            PlayerPrefs.SetInt("kr_diff", (RaceManager.Difficulty + 1) % 3);
+            Sfx.Play("click");
+            RefreshTitleToggles();
+        }
+
+        private void ToggleSound() { Sfx.Muted = !Sfx.Muted; RefreshTitleToggles(); Sfx.Play("click"); }
+
+        private void RefreshTitleToggles()
+        {
+            string[] d = { "EASY", "NORMAL", "HARD" };
+            _diffLabel.text = "BOTS: " + d[RaceManager.Difficulty];
+            _soundLabel.text = Sfx.Muted ? "SOUND: OFF" : "SOUND: ON";
         }
 
         private void PickColor(int i)
@@ -136,6 +167,7 @@ namespace KartRacer
                 _trackLabels[i].alignment = TextAlignmentOptions.Left;
                 ((RectTransform)_trackLabels[i].transform).offsetMin = new Vector2(24f, 0f);
             }
+            Btn(panel.transform, "GRAND PRIX  (all 5 tracks)", T, new Vector2(0f, -578f), new Vector2(470f, 40f), new Color(0.85f, 0.6f, 0.1f, 0.95f), () => StartGrandPrix(_region), 22f);
             SelectRegion(0);
         }
 
@@ -173,9 +205,18 @@ namespace KartRacer
             Panel(_results.transform, "Dim", new Color(0f, 0f, 0f, 0.7f));
             _resultTitle = Label(_results.transform, "", 70f, C, new Vector2(0f, 270f), new Vector2(1000f, 100f));
             _resultTitle.fontStyle = FontStyles.Bold;
-            _resultList = Label(_results.transform, "", 30f, C, new Vector2(0f, 20f), new Vector2(700f, 400f), TextAlignmentOptions.Center);
-            Btn(_results.transform, "NEXT TRACK", C, new Vector2(-250f, -270f), new Vector2(270f, 70f), new Color(0.15f, 0.7f, 0.3f), NextTrack, 30f);
-            Btn(_results.transform, "RETRY", C, new Vector2(40f, -270f), new Vector2(220f, 70f), new Color(0.2f, 0.45f, 0.9f), () => StartTrack(current), 30f);
+            _resultList = Label(_results.transform, "", 28f, C, new Vector2(230f, 10f), new Vector2(600f, 440f), TextAlignmentOptions.Center);
+            float[] px = { -470f, -330f, -190f };
+            for (int i = 0; i < 3; i++)
+            {
+                _podium[i] = Box(_results.transform, "Podium" + i, C, new Vector2(px[i], 0f), new Vector2(126f, 100f), Color.white);
+                _podiumNum[i] = Label(_podium[i].transform, (i == 0 ? 2 : i == 1 ? 1 : 3).ToString(), 56f, C, Vector2.zero, new Vector2(126f, 100f));
+                _podiumNum[i].fontStyle = FontStyles.Bold;
+                _podiumName[i] = Label(_results.transform, "", 24f, C, new Vector2(px[i], 0f), new Vector2(170f, 40f));
+            }
+            _nextBtn = Btn(_results.transform, "NEXT TRACK", C, new Vector2(-250f, -270f), new Vector2(270f, 70f), new Color(0.15f, 0.7f, 0.3f), NextTrack, 30f);
+            _nextLabel = _nextBtn.GetComponentInChildren<TMP_Text>();
+            _retryBtn = Btn(_results.transform, "RETRY", C, new Vector2(40f, -270f), new Vector2(220f, 70f), new Color(0.2f, 0.45f, 0.9f), () => StartTrack(current), 30f);
             Btn(_results.transform, "MAP", C, new Vector2(270f, -270f), new Vector2(200f, 70f), new Color(0.6f, 0.25f, 0.25f), OpenIsland, 30f);
             _results.SetActive(false);
         }
@@ -190,6 +231,8 @@ namespace KartRacer
         public void ShowTitle()
         {
             race.Cleanup(); cam.target = null; HideAll(); _title.SetActive(true);
+            _gpActive = false;
+            Sfx.Music(-1);
             Time.timeScale = 1f;
         }
 
@@ -205,6 +248,8 @@ namespace KartRacer
         {
             CommitName();
             race.Cleanup(); cam.target = null; HideAll(); _island.SetActive(true);
+            _gpActive = false;
+            Sfx.Music(-1);
             SelectRegion(_region);
             Time.timeScale = 1f;
         }
@@ -219,8 +264,23 @@ namespace KartRacer
             cam.Snap(race.player);
         }
 
+        private void StartGrandPrix(int region)
+        {
+            CommitName();
+            _gpActive = true; _gpRegion = region; _gpIndex = 0;
+            _gpPts = new Dictionary<string, int>(); _gpNames = new Dictionary<string, string>();
+            StartTrack(TrackDefs.Get(region, 0));
+        }
+
         private void NextTrack()
         {
+            if (_gpActive)
+            {
+                if (_gpIndex >= 4) { OpenIsland(); return; }
+                _gpIndex++;
+                StartTrack(TrackDefs.Get(_gpRegion, _gpIndex));
+                return;
+            }
             int next = (current.Id + 1) % TrackDefs.All.Count;
             _region = TrackDefs.All[next].region;
             StartTrack(TrackDefs.All[next]);
@@ -229,19 +289,77 @@ namespace KartRacer
         private void ShowResults()
         {
             var p = race.player;
+            var standings = race.Standings();
             float best = PlayerPrefs.GetFloat("kr_best_" + current.Id, 0f);
-            bool record = best <= 0f || p.finishTime < best;
+            bool record = p.finished && (best <= 0f || p.finishTime < best);
             if (record) { PlayerPrefs.SetFloat("kr_best_" + current.Id, p.finishTime); PlayerPrefs.Save(); }
             _resultTitle.text = p.place == 1 ? "YOU WIN!" : "YOU FINISHED " + Ordinal(p.place);
+
+            // grand prix points
+            var gained = new Dictionary<string, int>();
+            if (_gpActive)
+                foreach (var k in standings)
+                {
+                    string key = k.isPlayer ? "\u0001you" : k.racerName;
+                    int pts = GpPoints[Mathf.Clamp(k.place - 1, 0, GpPoints.Length - 1)];
+                    gained[key] = pts;
+                    _gpPts[key] = (_gpPts.TryGetValue(key, out int old) ? old : 0) + pts;
+                    _gpNames[key] = k.racerName;
+                }
+
             var sb = new System.Text.StringBuilder();
-            foreach (var k in race.Standings())
+            foreach (var k in standings)
             {
                 string time = k.finished ? TimeString(k.finishTime) : "DNF";
-                string line = k.place + ".  " + k.racerName + "   " + time;
+                string extra = "";
+                if (_gpActive) extra = "   <color=#ffd54a>+" + gained[k.isPlayer ? "\u0001you" : k.racerName] + "</color>";
+                string line = k.place + ".  " + k.racerName + "   " + time + extra;
                 sb.AppendLine(k.isPlayer ? "<color=#ffe15a><b>" + line + "</b></color>" : line);
             }
             if (record) sb.AppendLine("\n<color=#7dff9a>New best time!</color>");
+
+            if (_gpActive)
+            {
+                var order = new List<KeyValuePair<string, int>>(_gpPts);
+                order.Sort((x, y) => y.Value.CompareTo(x.Value));
+                bool last = _gpIndex >= 4;
+                sb.AppendLine("\n<color=#ffd54a><b>GRAND PRIX  -  race " + (_gpIndex + 1) + " of 5</b></color>");
+                int rank = 1;
+                foreach (var kv in order)
+                {
+                    bool you = kv.Key == "\u0001you";
+                    string line = rank + ". " + _gpNames[kv.Key] + "  " + kv.Value + " pts";
+                    sb.AppendLine(you ? "<color=#ffe15a>" + line + "</color>" : "<size=22>" + line + "</size>");
+                    rank++;
+                    if (rank > 4) break;
+                }
+                if (last)
+                {
+                    bool won = order[0].Key == "\u0001you";
+                    _resultTitle.text = won ? "GRAND PRIX CHAMPION!" : "GRAND PRIX COMPLETE";
+                }
+                _nextLabel.text = last ? "FINISH" : "NEXT RACE";
+            }
+            else _nextLabel.text = "NEXT TRACK";
+            _retryBtn.gameObject.SetActive(!_gpActive);
             _resultList.text = sb.ToString();
+
+            // podium
+            int[] slotFor = { 1, 0, 2 }; // podium index -> standings index (2nd, 1st, 3rd)
+            float[] heights = { 100f, 150f, 70f };
+            for (int i = 0; i < 3; i++)
+            {
+                bool has = slotFor[i] < standings.Count;
+                _podium[i].gameObject.SetActive(has); _podiumName[i].gameObject.SetActive(has);
+                if (!has) continue;
+                var k = standings[slotFor[i]];
+                var rt = _podium[i].rectTransform;
+                rt.sizeDelta = new Vector2(126f, heights[i]);
+                rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, -150f + heights[i] / 2f);
+                _podium[i].color = k.color;
+                _podiumName[i].text = k.racerName;
+                ((RectTransform)_podiumName[i].transform).anchoredPosition = new Vector2(rt.anchoredPosition.x, -150f + heights[i] + 28f);
+            }
             _results.SetActive(true);
         }
 
@@ -261,6 +379,7 @@ namespace KartRacer
         private void Update()
         {
             if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) TogglePause();
+            if (Keyboard.current != null && Keyboard.current.mKey.wasPressedThisFrame) { Sfx.Muted = !Sfx.Muted; RefreshTitleToggles(); }
         }
 
         // ------------------------------------------------------------------ island art

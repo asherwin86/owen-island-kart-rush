@@ -27,6 +27,10 @@ namespace KartRacer
         public class OnlineRacer { public int id; public string name; public Color color; public int slot; }
         public bool playerDone;
         private readonly List<AIDriver> _ais = new List<AIDriver>();
+        private int _lastBeep = 99;
+        /// <summary>0 = easy, 1 = normal, 2 = hard (saved as kr_diff).</summary>
+        public static int Difficulty => PlayerPrefs.GetInt("kr_diff", 1);
+        public static float DifficultyOffset => Difficulty == 0 ? -0.09f : Difficulty == 2 ? 0.05f : 0f;
 
         public void StartRace(TrackDef trackDef, string playerName, Color playerColor, int aiCount)
         {
@@ -60,7 +64,7 @@ namespace KartRacer
                 {
                     var ai = k.gameObject.AddComponent<AIDriver>();
                     ai.kart = k;
-                    ai.baseSkill = Mathf.Clamp(0.80f + 0.03f * def.difficulty + 0.012f * def.region + Random.Range(-0.03f, 0.03f), 0.75f, 0.97f);
+                    ai.baseSkill = Mathf.Clamp(0.80f + 0.03f * def.difficulty + 0.012f * def.region + Random.Range(-0.03f, 0.03f) + DifficultyOffset, 0.66f, 1.0f);
                     ai.skill = ai.baseSkill;
                     ai.laneOffset = Random.Range(-track.halfWidth * 0.3f, track.halfWidth * 0.3f);
                     _ais.Add(ai);
@@ -75,6 +79,8 @@ namespace KartRacer
             playerDriver.OnItemPressed = items.Use;
 
             state = RaceState.Countdown;
+            _lastBeep = 99;
+            Sfx.Music((int)def.theme);
             countdown = 3.99f;
             raceTime = 0f;
             playerDone = false;
@@ -112,6 +118,8 @@ namespace KartRacer
             items.OnEvent = (kart, msg) => { toast = msg; toastUntil = Time.time + 1.4f; };
             if (playerDriver != null) playerDriver.OnItemPressed = items.Use;
             state = RaceState.Countdown;
+            _lastBeep = 99;
+            Sfx.Music((int)def.theme);
             countdown = Mathf.Max(0.5f, countdownSeconds);
             raceTime = 0f; playerDone = false; finishedFor = 0f;
         }
@@ -140,8 +148,11 @@ namespace KartRacer
             if (state == RaceState.Countdown)
             {
                 countdown -= dt;
+                int whole = Mathf.CeilToInt(countdown);
+                if (whole != _lastBeep && whole >= 1 && whole <= 3) { _lastBeep = whole; Sfx.Play("beep", 0.7f); }
                 if (countdown <= 0f)
                 {
+                    Sfx.Play("go", 0.8f);
                     state = RaceState.Racing;
                     foreach (var k in karts) k.raceActive = true;
                     toast = "GO!"; toastUntil = Time.time + 1f;
@@ -184,6 +195,8 @@ namespace KartRacer
         private void HandlePlayerFinish()
         {
             playerDone = true;
+            Sfx.Play("finish", 0.9f);
+            if (player != null) Fx.Confetti(player.Position);
             toast = "FINISH!"; toastUntil = Time.time + 3f;
             // hand the kart to a bot so it keeps driving over the line
             if (playerDriver != null) { playerDriver.enabled = false; }

@@ -16,6 +16,12 @@ namespace KartRacer
                 var es = new GameObject("EventSystem", typeof(EventSystem), typeof(UnityEngine.InputSystem.UI.InputSystemUIInputModule));
             }
             GameFlow.Create();
+#if UNITY_EDITOR
+            int at = PlayerPrefs.GetInt("kr_autotest", 0);
+            PlayerPrefs.SetInt("kr_autotest", 0);
+            if (at == 1) new GameObject("TrackTester").AddComponent<TrackTester>();
+            if (at == 2) new GameObject("ResultsPreview").AddComponent<ResultsPreview>();
+#endif
         }
     }
 }

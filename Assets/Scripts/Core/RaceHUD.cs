@@ -170,9 +170,9 @@ namespace KartRacer
             if (p.item == ItemType.None && p.itemRoll <= 0f) { _item.text = ""; _itemBox.color = new Color(0f, 0f, 0f, 0.5f); }
             else
             {
-                ItemType show = p.itemRoll > 0f ? (ItemType)(1 + (int)(Time.time * 14f) % 4) : p.item;
-                _item.text = show.ToString().ToUpper();
-                _itemBox.color = show == ItemType.Turbo ? new Color(1f, 0.55f, 0.1f, 0.85f) : show == ItemType.Slick ? new Color(0.9f, 0.8f, 0.1f, 0.85f)
+                ItemType show = p.itemRoll > 0f ? (ItemType)(1 + (int)(Time.time * 14f) % 6) : p.item;
+                _item.text = show == ItemType.Triple && p.itemRoll <= 0f ? "TRIPLE x" + p.tripleLeft : show.ToString().ToUpper();
+                _itemBox.color = show == ItemType.Turbo || show == ItemType.Triple ? new Color(1f, 0.55f, 0.1f, 0.85f) : show == ItemType.Mega ? new Color(0.7f, 0.3f, 0.95f, 0.9f) : show == ItemType.Slick ? new Color(0.9f, 0.8f, 0.1f, 0.85f)
                     : show == ItemType.Bolt ? new Color(0.95f, 0.2f, 0.25f, 0.85f) : new Color(0.2f, 0.8f, 0.95f, 0.85f);
             }
 
