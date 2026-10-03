@@ -1,0 +1,9 @@
+{
+  "name": "kart-rush-server",
+  "version": "1.0.0",
+  "description": "WebSocket room server for Island Kart Rush online races",
+  "main": "kart-server.js",
+  "scripts": { "start": "node kart-server.js", "test": "node test.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "ws": "^8.18.0" }
+}
